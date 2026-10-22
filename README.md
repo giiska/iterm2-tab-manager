@@ -1,41 +1,61 @@
 # iTerm2 Tab Manager
 
-Small Python utility scaffold for iTerm2 scripting work.
+用于 iTerm2 脚本化的小工具集合。
 
-Planned feature set:
+计划的功能：
 
-- create a new tab in the current iTerm2 window
-- optionally copy selected profile settings to the new session
-- grow into additional tab/session management actions
+- 在当前 iTerm2 窗口新建标签页
+- 可选地把当前 profile 的设置复制到新会话
+- 后续扩展更多标签页/会话管理动作
 
-## Layout
+## 目录结构
 
-- `src/iterm2_tab_manager/` - package code
-- `scripts/create_tab.py` - script entry point for iTerm2
+- `scripts/AutoLaunch/create_tab_rpc.py` - iTerm2 实际运行的唯一脚本。它必须保持自包含：iTerm2 用它自己配置的脚本解释器来执行，不会用本项目的 Python 环境
+- `src/iterm2_tab_manager/` - 占用的包目录，留给以后多个脚本共用的逻辑
+- `pyproject.toml` - 依赖清单，主要作用是让 `pip install -e .` 能给开发环境提供 `iterm2` 库
 
-## Status
+## 当前状态
 
-This is a fresh development folder. The first utility being built here is tab creation and profile cloning.
+新建标签页、并沿用当前 profile 标签页颜色的逻辑已经可用。后续新增的标签页/会话动作先继续写在 `create_tab_rpc.py` 里，等出现第二个需要共用这些逻辑的脚本时再抽到包里。
 
-## Hotkey setup
+## 快捷键设置
 
-Bind `Cmd+Shift+T` in iTerm2 to call the registered RPC directly.
+在 iTerm2 里把 `Cmd+Shift+T` 绑定为直接调用已注册的 RPC。
 
-Recommended setup:
+推荐步骤：
 
-1. Open iTerm2 settings and go to the key bindings section.
-2. Add a new key mapping for `Cmd+Shift+T`.
-3. Set the action to `Invoke Script Function...`.
-4. Enter this function call: `create_tab(session_id: id)`
-5. Put this file into iTerm2's AutoLaunch Scripts folder: `scripts/AutoLaunch/create_tab_rpc.py`.
-6. Restart iTerm2 once so the daemon registers the RPC.
+1. 打开 iTerm2 设置，进入 Keys / Key Bindings（按键映射）部分。
+2. 新增一条 `Cmd+Shift+T` 的映射。
+3. 动作选择 `Invoke Script Function...`（调用脚本函数）。
+4. 填入函数调用：`create_tab(session_id: id)`
+5. 把 `scripts/AutoLaunch/create_tab_rpc.py` 复制到 iTerm2 的 AutoLaunch Scripts 目录（见下方「部署」）。
+6. 重启一次 iTerm2，让常驻脚本注册这个 RPC。
 
-For a random tab color instead, use:
+如果想要随机标签页颜色，改用：
 
 `create_tab_with_random_color(session_id: id)`
 
-The script creates a new tab in the current window and copies the active session's tab color when the current profile uses one.
+脚本会在当前窗口新建标签页；当前 profile 用了标签页颜色时，新标签页沿用同一颜色。随机颜色的版本会先收集本窗口各标签页已在用的颜色，避开重复。
 
-If you do not know where iTerm2's Scripts folder is, use `Scripts -> Manage -> Reveal Scripts in Finder` from the menu bar.
+不知道 iTerm2 的 Scripts 目录在哪，就用菜单栏的 `Scripts -> Manage -> Reveal Scripts in Finder`。
 
-If the old menu-item binding is still active, remove it. That path goes through the Scripts menu and is slower because iTerm2 has to launch the script through the menu item rather than calling the registered RPC directly.
+如果还有按键绑定指向之前那两个一次性脚本，改成指向上面的 RPC。那两个脚本每次按键都要经过 Scripts 菜单启动，比直接调用已注册的 RPC 慢，而且仓库里已经删掉了。
+
+## 部署
+
+iTerm2 不会读取本仓库，它运行的是自己 AutoLaunch 目录里的独立副本：
+
+```
+~/Library/Application Support/iTerm2/Scripts/AutoLaunch/create_tab_rpc.py
+```
+
+只改仓库里的文件不会生效。每次改完都要复制过去，再重启常驻脚本：
+
+```sh
+cp scripts/AutoLaunch/create_tab_rpc.py \
+   "$HOME/Library/Application Support/iTerm2/Scripts/AutoLaunch/create_tab_rpc.py"
+```
+
+脚本结尾是 `iterm2.run_forever`，启动后会一直存活，并把已加载的代码留在内存里。所以光覆盖文件不够，必须退出并重新打开 iTerm2，它才会重新读取文件、重新注册 RPC。
+
+按键是按函数名调用 RPC 的，不记录文件路径，因此重新部署不会弄坏绑定；但改函数名会——上面两个名字必须和按键设置里记录的保持一致。
